@@ -3,17 +3,22 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Rock Texture Fade</title>
+  <title>CSS-Only Normal Maps PoC</title>
   <style>
     :root {
-      --tile-size: 280px;
+      --tile-size: 1024px;
       --fade: 0.5;
-      --tint-hue: 0;
+      --tint-r: 255;
+      --tint-g: 64;
+      --tint-b: 64;
       --overlay-opacity: 1;
       --comp-r: 87;
       --comp-g: 26;
       --comp-b: 255;
       --gray-brightness: 1;
+      --gray-brightness-2: 1;
+      --gray-contrast: 1;
+      --incidence: 0;
     }
 
     * { box-sizing: border-box; }
@@ -63,7 +68,15 @@
       inset: 0;
       opacity: var(--fade);
       isolation: isolate;
-      filter: grayscale(1) brightness(var(--gray-brightness));
+      filter: grayscale(1) brightness(var(--gray-brightness)) brightness(var(--gray-brightness-2)) contrast(var(--gray-contrast));
+    }
+
+    .normal-wrap.apply {
+      mix-blend-mode: multiply;
+    }
+
+    .viewer.apply-mode .color {
+      opacity: 1;
     }
 
     .normal-stack {
@@ -72,12 +85,22 @@
     }
 
     .normal {
-      background-image: url("Rocks002_1K-JPG_NormalGL.jpg");
+      background-image: url("normal-remap.jpg");
       opacity: 1;
     }
 
+    .normal-incidence {
+      background: rgb(
+        calc(var(--incidence) * 255)
+        calc(var(--incidence) * 255)
+        calc(var(--incidence) * 255)
+      );
+      mix-blend-mode: screen;
+      opacity: var(--overlay-opacity);
+    }
+
     .normal-tint {
-      background: hsl(var(--tint-hue) 100% 50%);
+      background: rgb(var(--tint-r) var(--tint-g) var(--tint-b));
       mix-blend-mode: multiply;
       opacity: var(--overlay-opacity);
     }
@@ -95,6 +118,40 @@
       border: 1px solid #2c2c2c;
       border-radius: 10px;
       padding: 12px;
+    }
+
+    .quick-controls {
+      display: grid;
+      gap: 8px;
+      background: #1a1a1a;
+      border: 1px solid #2c2c2c;
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+    details.advanced {
+      background: #1a1a1a;
+      border: 1px solid #2c2c2c;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    details.advanced > summary {
+      cursor: pointer;
+      padding: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      user-select: none;
+    }
+
+    details.advanced[open] > summary {
+      border-bottom: 1px solid #2c2c2c;
+    }
+
+    details.advanced > .controls {
+      border: 0;
+      border-radius: 0;
+      background: transparent;
     }
 
     .row {
@@ -176,28 +233,55 @@
       image-rendering: auto;
       background: #000;
     }
+
+    #normalImage {
+      display: block;
+      width: 100%;
+      max-width: 1024px;
+      height: auto;
+      margin: 0 auto;
+      image-rendering: auto;
+      background: #000;
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
+    <h1>CSS-Only Normal Maps PoC</h1>
     <div class="viewer" aria-label="Tiled rocks texture preview">
       <div class="layer color" aria-hidden="true"></div>
       <div class="normal-wrap" aria-hidden="true">
         <div class="normal-stack">
           <div class="layer normal"></div>
+          <div class="layer normal-incidence"></div>
           <div class="layer normal-tint"></div>
           <div class="layer normal-comp"></div>
         </div>
       </div>
     </div>
 
-    <div class="controls">
+    <div class="quick-controls">
+      <div class="row">
+        <span>Azimuth</span>
+        <strong id="azimuthAmount">0deg</strong>
+      </div>
+      <input id="azimuth" type="range" min="0" max="360" value="0" />
+      <div class="row">
+        <span>Elevation</span>
+        <strong id="elevationAmount">0.000</strong>
+      </div>
+      <input id="elevation" type="range" min="0" max="1" step="0.001" value="0.000" />
+    </div>
+
+    <details class="advanced">
+      <summary>Advanced Controls</summary>
+      <div class="controls">
       <div class="row">
         <span>Color</span>
-        <strong id="amount">50%</strong>
+        <strong id="amount">100%</strong>
         <span>Normal</span>
       </div>
-      <input id="fade" type="range" min="0" max="100" value="50" />
+      <input id="fade" type="range" min="0" max="100" value="100" />
       <div class="row">
         <div class="row-left">
           <span>Tint Hue</span>
@@ -205,15 +289,34 @@
             <input id="overlayEnabled" type="checkbox" checked />
             Overlay
           </label>
+          <label>
+            <input id="applyEnabled" type="checkbox" checked />
+            Apply
+          </label>
         </div>
         <strong id="hueAmount">0deg</strong>
       </div>
       <input id="hueRotate" type="range" min="0" max="360" value="0" />
       <div class="row">
+        <span>Hue Wave Factor</span>
+        <strong id="hueWaveAmount">1.000</strong>
+      </div>
+      <input id="hueWaveFactor" type="range" min="0" max="1" step="0.001" value="1.000" />
+      <div class="row">
+        <span>Gray Contrast</span>
+        <strong id="contrastAmount">1.000</strong>
+      </div>
+      <input id="grayContrast" type="range" min="0" max="3" step="0.001" value="1.000" />
+      <div class="row">
         <span>Gray Offset</span>
         <strong id="offsetAmount">4.617</strong>
       </div>
-      <input id="grayOffset" type="range" min="0" max="8" step="0.001" value="4.617" />
+      <input id="grayOffset" type="range" min="0" max="20" step="0.001" value="4.617" />
+      <div class="row">
+        <span>Brightness Offset 2</span>
+        <strong id="offset2Amount">4.897</strong>
+      </div>
+      <input id="grayOffset2" type="range" min="-2" max="20" step="0.001" value="4.897" />
       <div class="row">
         <span>Gray Amplitude</span>
         <strong id="ampAmount">-1.276</strong>
@@ -229,18 +332,28 @@
         <strong id="amp3Amount">0.000</strong>
       </div>
       <input id="grayAmp3" type="range" min="-3" max="3" step="0.001" value="0.000" />
+      <div class="row">
+        <span>Incidence</span>
+        <strong id="incidenceAmount">0.000</strong>
+      </div>
+      <input id="incidence" type="range" min="0" max="1" step="0.001" value="0.000" />
       <button id="openNormal" class="btn" type="button">Open Normal (Canvas 1024x1024)</button>
-    </div>
+      </div>
+    </details>
   </div>
 
   <div id="normalModal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Normal map modal">
     <div class="modal-content">
       <div class="modal-head">
-        <strong>Normal Map Canvas (1024x1024)</strong>
-        <button id="closeNormal" class="btn" type="button">Close</button>
+        <strong>Normal Map Preview (1024x1024)</strong>
+        <div class="row-left">
+          <button id="downloadNormalJpg" class="btn" type="button">Download JPG</button>
+          <button id="closeNormal" class="btn" type="button">Close</button>
+        </div>
       </div>
       <div class="canvas-wrap">
-        <canvas id="normalCanvas" width="1024" height="1024"></canvas>
+        <img id="normalImage" src="normal-remap.jpg" alt="Normal remap preview" width="1024" height="1024" />
+        <!-- <canvas id="normalCanvas" width="1024" height="1024"></canvas> -->
       </div>
     </div>
   </div>
@@ -251,25 +364,41 @@
     const amount = document.getElementById('amount');
     const hueRotate = document.getElementById('hueRotate');
     const hueAmount = document.getElementById('hueAmount');
+    const azimuth = document.getElementById('azimuth');
+    const azimuthAmount = document.getElementById('azimuthAmount');
+    const elevation = document.getElementById('elevation');
+    const elevationAmount = document.getElementById('elevationAmount');
+    const hueWaveFactor = document.getElementById('hueWaveFactor');
+    const hueWaveAmount = document.getElementById('hueWaveAmount');
+    const grayContrast = document.getElementById('grayContrast');
+    const contrastAmount = document.getElementById('contrastAmount');
     const grayOffset = document.getElementById('grayOffset');
+    const grayOffset2 = document.getElementById('grayOffset2');
     const grayAmp = document.getElementById('grayAmp');
     const grayAmp2 = document.getElementById('grayAmp2');
     const grayAmp3 = document.getElementById('grayAmp3');
+    const incidence = document.getElementById('incidence');
+    const incidenceAmount = document.getElementById('incidenceAmount');
     const offsetAmount = document.getElementById('offsetAmount');
+    const offset2Amount = document.getElementById('offset2Amount');
     const ampAmount = document.getElementById('ampAmount');
     const amp2Amount = document.getElementById('amp2Amount');
     const amp3Amount = document.getElementById('amp3Amount');
     const openNormal = document.getElementById('openNormal');
+    const downloadNormalJpg = document.getElementById('downloadNormalJpg');
     const closeNormal = document.getElementById('closeNormal');
     const normalModal = document.getElementById('normalModal');
+    const viewer = document.querySelector('.viewer');
+    const normalWrap = document.querySelector('.normal-wrap');
     const normalLayer = document.querySelector('.normal');
-    const normalCanvas = document.getElementById('normalCanvas');
-    const normalCtx = normalCanvas.getContext('2d');
-    const remapCanvas = document.createElement('canvas');
-    remapCanvas.width = 1024;
-    remapCanvas.height = 1024;
-    const remapCtx = remapCanvas.getContext('2d');
-    let normalLoaded = false;
+    const normalImage = document.getElementById('normalImage');
+    // const normalCanvas = document.getElementById('normalCanvas');
+    // const normalCtx = normalCanvas.getContext('2d');
+    // const remapCanvas = document.createElement('canvas');
+    // remapCanvas.width = 1024;
+    // remapCanvas.height = 1024;
+    // const remapCtx = remapCanvas.getContext('2d');
+    // let normalLoaded = false;
 
     function updateFade() {
       const value = Number(slider.value);
@@ -280,14 +409,56 @@
 
     function updateHueRotate() {
       const degrees = Number(hueRotate.value);
-      root.style.setProperty('--tint-hue', `${degrees}`);
+      azimuth.value = `${degrees}`;
+      const theta = (degrees * Math.PI) / 180;
+      const c0 = Math.cos(theta);
+      const c1 = Math.cos(theta + (2 * Math.PI) / 3);
+      const c2 = Math.cos(theta + (4 * Math.PI) / 3);
+      const waveFactor = Number(hueWaveFactor.value);
+
+      const baseR = (c0 + 1) * 0.5;
+      const baseG = (c1 + 1) * 0.5;
+      const baseB = (c2 + 1) * 0.5;
+      const r = Math.round((1 - waveFactor * (1 - baseR)) * 255);
+      const g = Math.round((1 - waveFactor * (1 - baseG)) * 255);
+      const b = Math.round((1 - waveFactor * (1 - baseB)) * 255);
+
+      root.style.setProperty('--tint-r', `${r}`);
+      root.style.setProperty('--tint-g', `${g}`);
+      root.style.setProperty('--tint-b', `${b}`);
       hueAmount.textContent = `${degrees}deg`;
+      azimuthAmount.textContent = `${degrees}deg`;
+      hueWaveAmount.textContent = waveFactor.toFixed(3);
       updateGrayNormalization();
+    }
+
+    function updateAzimuth() {
+      hueRotate.value = azimuth.value;
+      updateHueRotate();
     }
 
     function updateOverlayEnabled() {
       const enabled = document.getElementById('overlayEnabled').checked;
       root.style.setProperty('--overlay-opacity', enabled ? '1' : '0');
+    }
+
+    function updateApplyEnabled() {
+      const enabled = document.getElementById('applyEnabled').checked;
+      normalWrap.classList.toggle('apply', enabled);
+      viewer.classList.toggle('apply-mode', enabled);
+    }
+
+    function updateGrayContrast() {
+      const value = Number(grayContrast.value);
+      root.style.setProperty('--gray-contrast', value.toFixed(3));
+      contrastAmount.textContent = value.toFixed(3);
+    }
+
+    function updateBrightnessOffset2() {
+      const offset2 = Number(grayOffset2.value);
+      const brightness2 = Math.max(0.001, 1 + offset2);
+      root.style.setProperty('--gray-brightness-2', brightness2.toFixed(6));
+      offset2Amount.textContent = offset2.toFixed(3);
     }
 
     function updateGrayNormalization() {
@@ -309,6 +480,19 @@
       ampAmount.textContent = amplitude120.toFixed(3);
       amp2Amount.textContent = amplitude60.toFixed(3);
       amp3Amount.textContent = amplitude15.toFixed(3);
+    }
+
+    function updateIncidence() {
+      const value = Number(incidence.value);
+      elevation.value = incidence.value;
+      root.style.setProperty('--incidence', value.toFixed(3));
+      incidenceAmount.textContent = value.toFixed(3);
+      elevationAmount.textContent = value.toFixed(3);
+    }
+
+    function updateElevation() {
+      incidence.value = elevation.value;
+      updateIncidence();
     }
 
     function drawNormalToCanvas() {
@@ -374,7 +558,7 @@
     }
 
     function openModal() {
-      drawNormalToCanvas();
+      // drawNormalToCanvas();
       normalModal.classList.add('open');
       normalModal.setAttribute('aria-hidden', 'false');
     }
@@ -384,14 +568,31 @@
       normalModal.setAttribute('aria-hidden', 'true');
     }
 
+    function downloadCanvasAsJpg() {
+      const link = document.createElement('a');
+      link.href = normalImage.src;
+      link.download = 'normal-remap.jpg';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }
+
     slider.addEventListener('input', updateFade);
     hueRotate.addEventListener('input', updateHueRotate);
+    azimuth.addEventListener('input', updateAzimuth);
+    hueWaveFactor.addEventListener('input', updateHueRotate);
+    grayContrast.addEventListener('input', updateGrayContrast);
     grayOffset.addEventListener('input', updateGrayNormalization);
+    grayOffset2.addEventListener('input', updateBrightnessOffset2);
     grayAmp.addEventListener('input', updateGrayNormalization);
     grayAmp2.addEventListener('input', updateGrayNormalization);
     grayAmp3.addEventListener('input', updateGrayNormalization);
+    incidence.addEventListener('input', updateIncidence);
+    elevation.addEventListener('input', updateElevation);
     document.getElementById('overlayEnabled').addEventListener('change', updateOverlayEnabled);
+    document.getElementById('applyEnabled').addEventListener('change', updateApplyEnabled);
     openNormal.addEventListener('click', openModal);
+    downloadNormalJpg.addEventListener('click', downloadCanvasAsJpg);
     closeNormal.addEventListener('click', closeModal);
     normalModal.addEventListener('click', (event) => {
       if (event.target === normalModal) closeModal();
@@ -403,8 +604,12 @@
     });
     updateFade();
     updateHueRotate();
+    updateGrayContrast();
+    updateBrightnessOffset2();
     updateOverlayEnabled();
-    drawNormalToCanvas();
+    updateApplyEnabled();
+    updateIncidence();
+    // drawNormalToCanvas();
   </script>
 </body>
 </html>
