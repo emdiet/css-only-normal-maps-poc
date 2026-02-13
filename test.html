@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rock Texture Fade</title>
+  <style>
+    :root {
+      --tile-size: 280px;
+      --fade: 0.5;
+      --tint-hue: 0;
+      --overlay-opacity: 1;
+      --comp-r: 87;
+      --comp-g: 26;
+      --comp-b: 255;
+      --gray-brightness: 1;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #111;
+      color: #f2f2f2;
+      font-family: Segoe UI, Tahoma, sans-serif;
+      padding: 24px;
+    }
+
+    .wrap {
+      width: min(920px, 95vw);
+      display: grid;
+      gap: 14px;
+    }
+
+    .viewer {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border: 1px solid #2c2c2c;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #0b0b0b;
+    }
+
+    .layer {
+      position: absolute;
+      inset: 0;
+      background-repeat: repeat;
+      background-size: var(--tile-size) var(--tile-size);
+      image-rendering: auto;
+    }
+
+    .color {
+      background-image: url("Rocks002_1K-JPG_Color.jpg");
+      opacity: calc(1 - var(--fade));
+    }
+
+    .normal-wrap {
+      position: absolute;
+      inset: 0;
+      opacity: var(--fade);
+      isolation: isolate;
+      filter: grayscale(1) brightness(var(--gray-brightness));
+    }
+
+    .normal-stack {
+      position: absolute;
+      inset: 0;
+    }
+
+    .normal {
+      background-image: url("Rocks002_1K-JPG_NormalGL.jpg");
+      opacity: 1;
+    }
+
+    .normal-tint {
+      background: hsl(var(--tint-hue) 100% 50%);
+      mix-blend-mode: multiply;
+      opacity: var(--overlay-opacity);
+    }
+
+    .normal-comp {
+      background: rgb(var(--comp-r) var(--comp-g) var(--comp-b));
+      mix-blend-mode: multiply;
+      opacity: var(--overlay-opacity);
+    }
+
+    .controls {
+      display: grid;
+      gap: 8px;
+      background: #1a1a1a;
+      border: 1px solid #2c2c2c;
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 14px;
+    }
+
+    .row-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: #58a6ff;
+    }
+
+    .btn {
+      border: 1px solid #3a3a3a;
+      background: #252525;
+      color: #f2f2f2;
+      border-radius: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+
+    .btn:hover {
+      background: #2d2d2d;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      place-items: center;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 10;
+      padding: 20px;
+    }
+
+    .modal.open {
+      display: grid;
+    }
+
+    .modal-content {
+      width: min(90vw, 1080px);
+      background: #161616;
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 14px;
+    }
+
+    .modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .canvas-wrap {
+      overflow: auto;
+      max-height: 75vh;
+      background: #0d0d0d;
+      border: 1px solid #2b2b2b;
+      border-radius: 10px;
+      padding: 10px;
+    }
+
+    #normalCanvas {
+      display: block;
+      width: 100%;
+      max-width: 1024px;
+      height: auto;
+      margin: 0 auto;
+      image-rendering: auto;
+      background: #000;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="viewer" aria-label="Tiled rocks texture preview">
+      <div class="layer color" aria-hidden="true"></div>
+      <div class="normal-wrap" aria-hidden="true">
+        <div class="normal-stack">
+          <div class="layer normal"></div>
+          <div class="layer normal-tint"></div>
+          <div class="layer normal-comp"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="row">
+        <span>Color</span>
+        <strong id="amount">50%</strong>
+        <span>Normal</span>
+      </div>
+      <input id="fade" type="range" min="0" max="100" value="50" />
+      <div class="row">
+        <div class="row-left">
+          <span>Tint Hue</span>
+          <label>
+            <input id="overlayEnabled" type="checkbox" checked />
+            Overlay
+          </label>
+        </div>
+        <strong id="hueAmount">0deg</strong>
+      </div>
+      <input id="hueRotate" type="range" min="0" max="360" value="0" />
+      <div class="row">
+        <span>Gray Offset</span>
+        <strong id="offsetAmount">4.617</strong>
+      </div>
+      <input id="grayOffset" type="range" min="0" max="8" step="0.001" value="4.617" />
+      <div class="row">
+        <span>Gray Amplitude</span>
+        <strong id="ampAmount">-1.276</strong>
+      </div>
+      <input id="grayAmp" type="range" min="-3" max="3" step="0.001" value="-1.276" />
+      <div class="row">
+        <span>Gray Amp 2x</span>
+        <strong id="amp2Amount">-0.259</strong>
+      </div>
+      <input id="grayAmp2" type="range" min="-3" max="3" step="0.001" value="-0.259" />
+      <div class="row">
+        <span>Gray Amp 15deg</span>
+        <strong id="amp3Amount">0.000</strong>
+      </div>
+      <input id="grayAmp3" type="range" min="-3" max="3" step="0.001" value="0.000" />
+      <button id="openNormal" class="btn" type="button">Open Normal (Canvas 1024x1024)</button>
+    </div>
+  </div>
+
+  <div id="normalModal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Normal map modal">
+    <div class="modal-content">
+      <div class="modal-head">
+        <strong>Normal Map Canvas (1024x1024)</strong>
+        <button id="closeNormal" class="btn" type="button">Close</button>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="normalCanvas" width="1024" height="1024"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const root = document.documentElement;
+    const slider = document.getElementById('fade');
+    const amount = document.getElementById('amount');
+    const hueRotate = document.getElementById('hueRotate');
+    const hueAmount = document.getElementById('hueAmount');
+    const grayOffset = document.getElementById('grayOffset');
+    const grayAmp = document.getElementById('grayAmp');
+    const grayAmp2 = document.getElementById('grayAmp2');
+    const grayAmp3 = document.getElementById('grayAmp3');
+    const offsetAmount = document.getElementById('offsetAmount');
+    const ampAmount = document.getElementById('ampAmount');
+    const amp2Amount = document.getElementById('amp2Amount');
+    const amp3Amount = document.getElementById('amp3Amount');
+    const openNormal = document.getElementById('openNormal');
+    const closeNormal = document.getElementById('closeNormal');
+    const normalModal = document.getElementById('normalModal');
+    const normalLayer = document.querySelector('.normal');
+    const normalCanvas = document.getElementById('normalCanvas');
+    const normalCtx = normalCanvas.getContext('2d');
+    const remapCanvas = document.createElement('canvas');
+    remapCanvas.width = 1024;
+    remapCanvas.height = 1024;
+    const remapCtx = remapCanvas.getContext('2d');
+    let normalLoaded = false;
+
+    function updateFade() {
+      const value = Number(slider.value);
+      const t = value / 100;
+      root.style.setProperty('--fade', t);
+      amount.textContent = `${value}%`;
+    }
+
+    function updateHueRotate() {
+      const degrees = Number(hueRotate.value);
+      root.style.setProperty('--tint-hue', `${degrees}`);
+      hueAmount.textContent = `${degrees}deg`;
+      updateGrayNormalization();
+    }
+
+    function updateOverlayEnabled() {
+      const enabled = document.getElementById('overlayEnabled').checked;
+      root.style.setProperty('--overlay-opacity', enabled ? '1' : '0');
+    }
+
+    function updateGrayNormalization() {
+      const degrees = Number(hueRotate.value);
+      const offset = Number(grayOffset.value);
+      const amplitude120 = Number(grayAmp.value);
+      const amplitude60 = Number(grayAmp2.value);
+      const amplitude15 = Number(grayAmp3.value);
+      const radians = (degrees * Math.PI) / 180;
+
+      // Peaks near 60/180/300 and valleys near 0/120/240/360.
+      const wave120 = Math.sin(3 * radians - Math.PI / 2);
+      const wave60 = Math.sin(6 * radians - Math.PI / 2);
+      const wave15 = Math.sin(24 * radians - Math.PI / 2);
+      const brightness = Math.max(0.001, offset + amplitude120 * wave120 + amplitude60 * wave60 + amplitude15 * wave15);
+
+      root.style.setProperty('--gray-brightness', `${brightness.toFixed(6)}`);
+      offsetAmount.textContent = offset.toFixed(3);
+      ampAmount.textContent = amplitude120.toFixed(3);
+      amp2Amount.textContent = amplitude60.toFixed(3);
+      amp3Amount.textContent = amplitude15.toFixed(3);
+    }
+
+    function drawNormalToCanvas() {
+      if (normalLoaded) return;
+      const img = new Image();
+      img.onload = () => {
+        remapCtx.clearRect(0, 0, remapCanvas.width, remapCanvas.height);
+        remapCtx.drawImage(img, 0, 0, remapCanvas.width, remapCanvas.height);
+        remapNormalsToColorDome();
+        normalLoaded = true;
+      };
+      img.src = 'Rocks002_1K-JPG_NormalGL.jpg';
+    }
+
+    function hsvToRgb(h, s, v) {
+      const c = v * s;
+      const hp = h * 6;
+      const x = c * (1 - Math.abs((hp % 2) - 1));
+      let r = 0;
+      let g = 0;
+      let b = 0;
+
+      if (hp >= 0 && hp < 1) [r, g, b] = [c, x, 0];
+      else if (hp >= 1 && hp < 2) [r, g, b] = [x, c, 0];
+      else if (hp >= 2 && hp < 3) [r, g, b] = [0, c, x];
+      else if (hp >= 3 && hp < 4) [r, g, b] = [0, x, c];
+      else if (hp >= 4 && hp < 5) [r, g, b] = [x, 0, c];
+      else [r, g, b] = [c, 0, x];
+
+      const m = v - c;
+      return [r + m, g + m, b + m];
+    }
+
+    function remapNormalsToColorDome() {
+      const imageData = remapCtx.getImageData(0, 0, remapCanvas.width, remapCanvas.height);
+      const data = imageData.data;
+
+      for (let i = 0; i < data.length; i += 4) {
+        let nx = (data[i] / 255) * 2 - 1;
+        let ny = (data[i + 1] / 255) * 2 - 1;
+        let nz = (data[i + 2] / 255) * 2 - 1;
+
+        const len = Math.hypot(nx, ny, nz) || 1;
+        nx /= len;
+        ny /= len;
+        nz /= len;
+
+        const theta = Math.atan2(ny, nx);
+        const hue = (theta + Math.PI) / (2 * Math.PI);
+        const sat = Math.max(0, Math.min(1, Math.hypot(nx, ny)));
+        const value = Math.max(0, Math.min(1, nz));
+
+        const [r, g, b] = hsvToRgb(hue, sat, value);
+        data[i] = Math.round(r * 255);
+        data[i + 1] = Math.round(g * 255);
+        data[i + 2] = Math.round(b * 255);
+      }
+
+      remapCtx.putImageData(imageData, 0, 0);
+      normalCtx.clearRect(0, 0, normalCanvas.width, normalCanvas.height);
+      normalCtx.drawImage(remapCanvas, 0, 0, normalCanvas.width, normalCanvas.height);
+      normalLayer.style.backgroundImage = `url('${remapCanvas.toDataURL('image/png')}')`;
+    }
+
+    function openModal() {
+      drawNormalToCanvas();
+      normalModal.classList.add('open');
+      normalModal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeModal() {
+      normalModal.classList.remove('open');
+      normalModal.setAttribute('aria-hidden', 'true');
+    }
+
+    slider.addEventListener('input', updateFade);
+    hueRotate.addEventListener('input', updateHueRotate);
+    grayOffset.addEventListener('input', updateGrayNormalization);
+    grayAmp.addEventListener('input', updateGrayNormalization);
+    grayAmp2.addEventListener('input', updateGrayNormalization);
+    grayAmp3.addEventListener('input', updateGrayNormalization);
+    document.getElementById('overlayEnabled').addEventListener('change', updateOverlayEnabled);
+    openNormal.addEventListener('click', openModal);
+    closeNormal.addEventListener('click', closeModal);
+    normalModal.addEventListener('click', (event) => {
+      if (event.target === normalModal) closeModal();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && normalModal.classList.contains('open')) {
+        closeModal();
+      }
+    });
+    updateFade();
+    updateHueRotate();
+    updateOverlayEnabled();
+    drawNormalToCanvas();
+  </script>
+</body>
+</html>
