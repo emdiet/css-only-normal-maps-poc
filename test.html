@@ -243,6 +243,35 @@
       image-rendering: auto;
       background: #000;
     }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .upload-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .dropzone {
+      border: 1px dashed #4a4a4a;
+      border-radius: 10px;
+      padding: 14px;
+      background: #121212;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .dropzone.dragover {
+      border-color: #58a6ff;
+      background: #172132;
+    }
+
+    .hint {
+      font-size: 12px;
+      color: #b9b9b9;
+      margin: 10px 0 0 0;
+    }
   </style>
 </head>
 <body>
@@ -271,6 +300,10 @@
         <strong id="elevationAmount">0.000</strong>
       </div>
       <input id="elevation" type="range" min="0" max="1" step="0.001" value="0.000" />
+      <div class="row-left">
+        <button id="openUpload" class="btn" type="button">Upload Texture</button>
+        <button id="resetTexture" class="btn" type="button">Reset</button>
+      </div>
     </div>
 
     <details class="advanced">
@@ -353,8 +386,28 @@
       </div>
       <div class="canvas-wrap">
         <img id="normalImage" src="normal-remap.jpg" alt="Normal remap preview" width="1024" height="1024" />
-        <!-- <canvas id="normalCanvas" width="1024" height="1024"></canvas> -->
+        <canvas id="normalCanvas" class="hidden" width="1024" height="1024"></canvas>
       </div>
+    </div>
+  </div>
+
+  <div id="uploadModal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Upload texture maps">
+    <div class="modal-content">
+      <div class="modal-head">
+        <strong>Upload Texture Maps</strong>
+        <button id="closeUpload" class="btn" type="button">Close</button>
+      </div>
+      <div class="upload-grid">
+        <div id="colorDrop" class="dropzone" role="button" tabindex="0">
+          <span id="colorDropLabel">Color Map: drag/drop or click to pick</span>
+          <input id="colorFile" class="hidden" type="file" accept="image/*" />
+        </div>
+        <div id="normalDrop" class="dropzone" role="button" tabindex="0">
+          <span id="normalDropLabel">Normal Map: drag/drop or click to pick</span>
+          <input id="normalFile" class="hidden" type="file" accept="image/*" />
+        </div>
+      </div>
+      <p class="hint">When both files are selected, they are applied immediately.</p>
     </div>
   </div>
 
@@ -385,20 +438,40 @@
     const amp2Amount = document.getElementById('amp2Amount');
     const amp3Amount = document.getElementById('amp3Amount');
     const openNormal = document.getElementById('openNormal');
+    const openUpload = document.getElementById('openUpload');
+    const resetTexture = document.getElementById('resetTexture');
     const downloadNormalJpg = document.getElementById('downloadNormalJpg');
     const closeNormal = document.getElementById('closeNormal');
     const normalModal = document.getElementById('normalModal');
+    const uploadModal = document.getElementById('uploadModal');
+    const closeUpload = document.getElementById('closeUpload');
     const viewer = document.querySelector('.viewer');
+    const colorLayer = document.querySelector('.color');
     const normalWrap = document.querySelector('.normal-wrap');
     const normalLayer = document.querySelector('.normal');
     const normalImage = document.getElementById('normalImage');
-    // const normalCanvas = document.getElementById('normalCanvas');
-    // const normalCtx = normalCanvas.getContext('2d');
-    // const remapCanvas = document.createElement('canvas');
-    // remapCanvas.width = 1024;
-    // remapCanvas.height = 1024;
-    // const remapCtx = remapCanvas.getContext('2d');
-    // let normalLoaded = false;
+    const normalCanvas = document.getElementById('normalCanvas');
+    const normalCtx = normalCanvas.getContext('2d');
+    const remapCanvas = document.createElement('canvas');
+    remapCanvas.width = 1024;
+    remapCanvas.height = 1024;
+    const remapCtx = remapCanvas.getContext('2d');
+    const colorDrop = document.getElementById('colorDrop');
+    const normalDrop = document.getElementById('normalDrop');
+    const colorDropLabel = document.getElementById('colorDropLabel');
+    const normalDropLabel = document.getElementById('normalDropLabel');
+    const colorFile = document.getElementById('colorFile');
+    const normalFile = document.getElementById('normalFile');
+    const DEFAULT_COLOR_MAP = 'Rocks002_1K-JPG_Color.jpg';
+    const DEFAULT_NORMAL_MAP = 'Rocks002_1K-JPG_NormalGL.jpg';
+    const DEFAULT_REMAP_MAP = 'normal-remap.jpg';
+    let normalLoaded = false;
+    let currentNormalSource = '';
+    let activeCanvasMode = false;
+    let pendingColorMapFile = null;
+    let pendingNormalMapFile = null;
+    let uploadedColorUrl = '';
+    let uploadedNormalUrl = '';
 
     function updateFade() {
       const value = Number(slider.value);
@@ -495,16 +568,17 @@
       updateIncidence();
     }
 
-    function drawNormalToCanvas() {
-      if (normalLoaded) return;
+    function drawNormalToCanvas(sourceUrl = DEFAULT_NORMAL_MAP, force = false) {
+      if (normalLoaded && !force && currentNormalSource === sourceUrl) return;
       const img = new Image();
       img.onload = () => {
         remapCtx.clearRect(0, 0, remapCanvas.width, remapCanvas.height);
         remapCtx.drawImage(img, 0, 0, remapCanvas.width, remapCanvas.height);
         remapNormalsToColorDome();
         normalLoaded = true;
+        currentNormalSource = sourceUrl;
       };
-      img.src = 'Rocks002_1K-JPG_NormalGL.jpg';
+      img.src = sourceUrl;
     }
 
     function hsvToRgb(h, s, v) {
@@ -558,7 +632,9 @@
     }
 
     function openModal() {
-      // drawNormalToCanvas();
+      if (activeCanvasMode) {
+        drawNormalToCanvas(uploadedNormalUrl || DEFAULT_NORMAL_MAP);
+      }
       normalModal.classList.add('open');
       normalModal.setAttribute('aria-hidden', 'false');
     }
@@ -570,11 +646,116 @@
 
     function downloadCanvasAsJpg() {
       const link = document.createElement('a');
-      link.href = normalImage.src;
+      if (activeCanvasMode) {
+        link.href = normalCanvas.toDataURL('image/jpeg', 0.95);
+      } else {
+        link.href = normalImage.src;
+      }
       link.download = 'normal-remap.jpg';
       document.body.appendChild(link);
       link.click();
       link.remove();
+    }
+
+    function openUploadModal() {
+      uploadModal.classList.add('open');
+      uploadModal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeUploadModal() {
+      uploadModal.classList.remove('open');
+      uploadModal.setAttribute('aria-hidden', 'true');
+    }
+
+    function setCanvasMode(enabled) {
+      activeCanvasMode = enabled;
+      normalImage.classList.toggle('hidden', enabled);
+      normalCanvas.classList.toggle('hidden', !enabled);
+    }
+
+    function revokeUploadedUrls() {
+      if (uploadedColorUrl) URL.revokeObjectURL(uploadedColorUrl);
+      if (uploadedNormalUrl) URL.revokeObjectURL(uploadedNormalUrl);
+      uploadedColorUrl = '';
+      uploadedNormalUrl = '';
+    }
+
+    function updateDropzoneLabels() {
+      colorDropLabel.textContent = pendingColorMapFile
+        ? `Color Map: ${pendingColorMapFile.name}`
+        : 'Color Map: drag/drop or click to pick';
+      normalDropLabel.textContent = pendingNormalMapFile
+        ? `Normal Map: ${pendingNormalMapFile.name}`
+        : 'Normal Map: drag/drop or click to pick';
+    }
+
+    function tryApplyUploadMaps() {
+      if (!pendingColorMapFile || !pendingNormalMapFile) return;
+
+      revokeUploadedUrls();
+      uploadedColorUrl = URL.createObjectURL(pendingColorMapFile);
+      uploadedNormalUrl = URL.createObjectURL(pendingNormalMapFile);
+      colorLayer.style.backgroundImage = `url("${uploadedColorUrl}")`;
+      setCanvasMode(true);
+      normalLoaded = false;
+      currentNormalSource = '';
+      drawNormalToCanvas(uploadedNormalUrl, true);
+      closeUploadModal();
+    }
+
+    function setColorMapFile(file) {
+      if (!file) return;
+      pendingColorMapFile = file;
+      updateDropzoneLabels();
+      tryApplyUploadMaps();
+    }
+
+    function setNormalMapFile(file) {
+      if (!file) return;
+      pendingNormalMapFile = file;
+      updateDropzoneLabels();
+      tryApplyUploadMaps();
+    }
+
+    function bindDropzone(dropEl, inputEl, onFile) {
+      dropEl.addEventListener('click', () => inputEl.click());
+      dropEl.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          inputEl.click();
+        }
+      });
+      inputEl.addEventListener('change', () => onFile(inputEl.files[0]));
+
+      ['dragenter', 'dragover'].forEach((eventName) => {
+        dropEl.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          dropEl.classList.add('dragover');
+        });
+      });
+      ['dragleave', 'drop'].forEach((eventName) => {
+        dropEl.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          dropEl.classList.remove('dragover');
+        });
+      });
+      dropEl.addEventListener('drop', (event) => {
+        const file = event.dataTransfer.files && event.dataTransfer.files[0];
+        onFile(file);
+      });
+    }
+
+    function resetTexturesToDefault() {
+      pendingColorMapFile = null;
+      pendingNormalMapFile = null;
+      updateDropzoneLabels();
+      revokeUploadedUrls();
+      colorLayer.style.backgroundImage = `url("${DEFAULT_COLOR_MAP}")`;
+      normalLayer.style.backgroundImage = `url("${DEFAULT_REMAP_MAP}")`;
+      normalImage.src = DEFAULT_REMAP_MAP;
+      setCanvasMode(false);
+      normalLoaded = false;
+      currentNormalSource = '';
     }
 
     slider.addEventListener('input', updateFade);
@@ -592,14 +773,25 @@
     document.getElementById('overlayEnabled').addEventListener('change', updateOverlayEnabled);
     document.getElementById('applyEnabled').addEventListener('change', updateApplyEnabled);
     openNormal.addEventListener('click', openModal);
+    openUpload.addEventListener('click', openUploadModal);
+    resetTexture.addEventListener('click', resetTexturesToDefault);
     downloadNormalJpg.addEventListener('click', downloadCanvasAsJpg);
     closeNormal.addEventListener('click', closeModal);
+    closeUpload.addEventListener('click', closeUploadModal);
+    bindDropzone(colorDrop, colorFile, setColorMapFile);
+    bindDropzone(normalDrop, normalFile, setNormalMapFile);
     normalModal.addEventListener('click', (event) => {
       if (event.target === normalModal) closeModal();
+    });
+    uploadModal.addEventListener('click', (event) => {
+      if (event.target === uploadModal) closeUploadModal();
     });
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && normalModal.classList.contains('open')) {
         closeModal();
+      }
+      if (event.key === 'Escape' && uploadModal.classList.contains('open')) {
+        closeUploadModal();
       }
     });
     updateFade();
@@ -609,7 +801,7 @@
     updateOverlayEnabled();
     updateApplyEnabled();
     updateIncidence();
-    // drawNormalToCanvas();
+    resetTexturesToDefault();
   </script>
 </body>
 </html>
