@@ -1,6 +1,6 @@
 try it: https://emdiet.github.io/css-only-normal-maps-poc/test.html
 
-Can normal maps be applied to css quads even when webgpu/webgl isn't available? yes!
+Can normal maps be applied to css quads even when webgpu/webgl isn't available? yes! (sorta, requires more work, but looks promising)
 
 https://github.com/user-attachments/assets/6b4e99a0-770d-4f0e-86d7-529e0afcce9e
 
