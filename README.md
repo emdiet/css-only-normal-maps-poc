@@ -1,4 +1,6 @@
-try it: https://emdiet.github.io/css-only-normal-maps-poc/test.html
+try it: https://emdiet.github.io/css-only-normal-maps-poc/v1/test.html
+
+(other attempt, shadows only: https://emdiet.github.io/css-only-normal-maps-poc/v2/test.html)
 
 Can normal maps be applied to css quads even when webgpu/webgl isn't available? yes! (sorta, requires more work, but looks promising)
 
@@ -59,6 +61,10 @@ I think the normal remapping alogrithm could work better with a sine based appro
 Is it worth it as a fallback? 
 
 Potentially, the profiler says it's blazing fast.
+
+But there are multiple issues. The fact that grayscale compresses the green channel so much (rgb(87, 26, 255)), implies that there are only around 9 encodable/reachable brightness levels in that particular channel.
+
+Maybe this can be revisited when CSS exposes a matrix filter.
 
 ## Textures
 
